@@ -6,3 +6,5 @@
 tmp/
 temp/
 TODO*
+__pycache__
+.vscode
