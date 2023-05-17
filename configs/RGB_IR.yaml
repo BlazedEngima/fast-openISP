@@ -1,20 +1,20 @@
 module_enable_status:                 # do NOT modify modules order
-  dpc: True
+  dpc: False
   blc: True
   aaf: True
-  awb: True
+  awb: False
   cnf: True
   cfa: True
   ccm: True
-  gac: True
-  csc: True
-  nlm: True
-  bnf: True
-  ceh: True
-  eeh: True
-  fcs: True
-  hsc: True
-  bcc: True
+  gac: False
+  csc: False
+  nlm: False
+  bnf: False
+  ceh: False
+  eeh: False
+  fcs: False
+  hsc: False
+  bcc: False
   scl: False
 
 hardware:
