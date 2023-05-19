@@ -1,15 +1,16 @@
 from collections import OrderedDict
 import numpy as np
+import os
+import math
+import time
+import cv2
+
 np.set_printoptions(
     suppress=True, 
     formatter={
         'int_kind':'{:d}'.format
     }
 )
-import os
-import math
-import time
-import cv2
 
 # Helper function to convert numpy array into a txt file
 def save_to_txt(name, obj):
