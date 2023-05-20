@@ -5,6 +5,7 @@ import math
 import time
 import cv2
 
+# For debugging
 np.set_printoptions(
     suppress=True, 
     formatter={
@@ -19,40 +20,53 @@ def save_to_txt(name, obj):
 
 # Gets a mask at the coordinate positions of the color sensors
 def mask_by_color(color):
+    
+    # Get indices of the r, g, b, and ir of the 4x4 kernel from the sensor
     indices = rgb_ir_indices[color]
+
+    # Create a mask for the kernel
     small_mask = np.zeros((4, 4), dtype=bool)
     for idx in indices:
         small_mask[idx] = True
 
+    # Calculate how many repetitions to perform to tile the mask for both the height and width
     repetitions = (
                     math.ceil(bayer.shape[0] / small_mask.shape[0]), 
                     math.ceil(bayer.shape[1] / small_mask.shape[1])
                    )
 
+    # Extend the mask to make it the full raw resolution
     mask = np.tile(small_mask, repetitions)
 
     return mask
 
 # Splits the main raw file into the color sub-arrays
-def get_color_sub_arrays():
+def get_color_sub_arrays(storage):
     for color in rgb_ir_indices:
-        # start_time = time.time()
+
+        # Get a mask for a color
         mask = mask_by_color(color)
 
+        # Apply the mask on the color array
         color_array = np.where(mask, bayer, 0)
-        sub_arrays[color] = color_array
-        # end_time = time.time() - start_time
-        # print(f'{color}_array done. Time elapsed {end_time:.3f}s')
+
+        # Add to the storage dictionary (is sub_array)
+        storage[color] = color_array
 
         # save_to_txt(f'{color}.txt', color_array)
 
 # Linearly interpolates a sub-array on columns with a certain color argument 
 def interpolate_vertical(image, color):
     coords = rgb_ir_indices[color]
+
+    # Get the columns to interpolate on
     interpolation_axis = set(coords[i][0] for i in range(len(coords)))
     interpolation_axis = list(interpolation_axis)
-    y = np.arange(image.shape[0])
 
+    # Get all of the row indices
+    y = np.arange(image.shape[0])
+    
+    # Get a mask to apply to the desired columns
     col_mask = np.zeros((image.shape[0], 4), dtype=bool)
     col_mask[:, interpolation_axis] = True
 
@@ -61,6 +75,8 @@ def interpolate_vertical(image, color):
     mask = np.tile(col_mask, repetitions)
     
     interpolated_matrix = np.zeros_like(image)
+
+    # Perform interpolation on every column, ignores columns filled with zeros
     for col in range(image.shape[1]):
         x = image[:, col]
         non_zero_indices = np.where(x != 0)[0]
@@ -72,16 +88,22 @@ def interpolate_vertical(image, color):
 
         interpolated_matrix[:, col] = interpolated_col
 
+    # Apply mask
     interpolated_image = np.where(mask, interpolated_matrix, 0)
     return interpolated_image
 
 # Linearly interpolates a sub-array horizontally on rows with a certain color argument 
 def interpolate_horizontal(image, color):
     coords = rgb_ir_indices[color]
+
+    # Get the columns to interpolate on
     interpolation_axis = set(coords[i][0] for i in range(len(coords)))
     interpolation_axis = list(interpolation_axis)
+
+    # Get all of the column indices
     x = np.arange(image.shape[1])
 
+    # Get a mask to apply to the desired rows
     row_mask = np.zeros((4, image.shape[1]), dtype=bool)
     row_mask[interpolation_axis] = True
 
@@ -90,6 +112,8 @@ def interpolate_horizontal(image, color):
     mask = np.tile(row_mask, repetitions)
     
     interpolated_matrix = np.zeros_like(image)
+
+    # Perform interpolation on every row, ignores rows filled with zeros
     for row in range(image.shape[0]):
         y = image[row, :]
         non_zero_indices = np.where(y != 0)[0]
@@ -101,6 +125,7 @@ def interpolate_horizontal(image, color):
 
         interpolated_matrix[row, :] = interpolated_row
 
+    # Apply mask
     interpolated_image = np.where(mask, interpolated_matrix, 0)
     return interpolated_image
 
@@ -129,10 +154,19 @@ def guided_upsampling(image, guide, sigma=1.0):
 # Gets the final interpolated row
 def get_row_interpolation(color, image, upsample):
     mask = mask_by_color(color)
+
+    # Apply mask to upsampled color channel
     masked_array = np.where(mask, upsample, 0)
+
+    # Get the difference between the original color channel and
+    # the upsampled color channel
     residue = image - masked_array
+
+    # Linearly interpolate the difference
     residue = interpolate_horizontal(residue, color)
 
+    # Sum the results of the interpolated difference and the
+    # upsampled color channel
     result = residue + masked_array
     result = np.clip(result, 0, 255)
 
@@ -142,10 +176,19 @@ def get_row_interpolation(color, image, upsample):
 # Gets the final interpolated column
 def get_column_interpolation(color, image, upsample):
     mask = mask_by_color(color)
+
+    # Apply mask to upsampled color channel
     masked_array = np.where(mask, upsample, 0)
+
+    # Get the difference between the original color channel and
+    # the upsampled color channel
     residue = image - masked_array
+
+    # Linearly interpolate the difference
     residue = interpolate_vertical(residue, color)
 
+    # Sum the results of the interpolated difference and the
+    # upsampled color channel
     result = residue + masked_array
     result = np.clip(result, 0, 255)
 
@@ -167,7 +210,7 @@ if __name__ == '__main__':
                     'IR'    : ((1, 1), (1, 3), (3, 1), (3, 3))
                  }
 
-    get_color_sub_arrays()
+    get_color_sub_arrays(sub_arrays)
     
     for color in rgb_ir_indices:
         if color == 'green':
