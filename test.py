@@ -4,6 +4,9 @@ import os
 import math
 import time
 import cv2
+from scipy.interpolate import interp1d
+from scipy.interpolate import interp2d
+import pandas as pd
 
 # For debugging
 np.set_printoptions(
@@ -63,9 +66,6 @@ def interpolate_vertical(image, color):
     interpolation_axis = set(coords[i][0] for i in range(len(coords)))
     interpolation_axis = list(interpolation_axis)
 
-    # Get all of the row indices
-    y = np.arange(image.shape[0])
-    
     # Get a mask to apply to the desired columns
     col_mask = np.zeros((image.shape[0], 4), dtype=bool)
     col_mask[:, interpolation_axis] = True
@@ -78,15 +78,14 @@ def interpolate_vertical(image, color):
 
     # Perform interpolation on every column, ignores columns filled with zeros
     for col in range(image.shape[1]):
-        x = image[:, col]
-        non_zero_indices = np.where(x != 0)[0]
+        if np.all(image[:, col] == 0):
+            continue
 
-        if len(non_zero_indices) > 0:
-            interpolated_col = np.interp(y, non_zero_indices, x[non_zero_indices])
-        else:
-            interpolated_col = np.zeros_like(x)
-
-        interpolated_matrix[:, col] = interpolated_col
+        x = pd.Series(image[:, col])
+        x.replace(0, np.nan, inplace=True)
+        x.interpolate(inplace=True)
+        x.replace(np.nan, 0, inplace=True)
+        interpolated_matrix[:, col] = x.values
 
     # Apply mask
     interpolated_image = np.where(mask, interpolated_matrix, 0)
@@ -100,9 +99,6 @@ def interpolate_horizontal(image, color):
     interpolation_axis = set(coords[i][0] for i in range(len(coords)))
     interpolation_axis = list(interpolation_axis)
 
-    # Get all of the column indices
-    x = np.arange(image.shape[1])
-
     # Get a mask to apply to the desired rows
     row_mask = np.zeros((4, image.shape[1]), dtype=bool)
     row_mask[interpolation_axis] = True
@@ -115,15 +111,15 @@ def interpolate_horizontal(image, color):
 
     # Perform interpolation on every row, ignores rows filled with zeros
     for row in range(image.shape[0]):
-        y = image[row, :]
-        non_zero_indices = np.where(y != 0)[0]
+        if np.all(image[row] == 0):
+            continue
 
-        if len(non_zero_indices) > 0:
-            interpolated_row = np.interp(x, non_zero_indices, y[non_zero_indices])
-        else:
-            interpolated_row = np.zeros_like(y)
+        y = pd.Series(image[row, :])
+        y.replace(0, np.nan, inplace=True)
+        y.interpolate(inplace=True)
+        y.replace(np.nan, 0, inplace=True)
 
-        interpolated_matrix[row, :] = interpolated_row
+        interpolated_matrix[row, :] = y.values
 
     # Apply mask
     interpolated_image = np.where(mask, interpolated_matrix, 0)
@@ -170,7 +166,7 @@ def get_row_interpolation(color, image, upsample):
     result = residue + masked_array
     result = np.clip(result, 0, 255)
 
-    # save_to_txt(f'green_{color}_row_interpolation.txt', result)
+    # save_to_txt(f'interpolated_{color}_row.txt', result)
     return result
 
 # Gets the final interpolated column
@@ -192,8 +188,45 @@ def get_column_interpolation(color, image, upsample):
     result = residue + masked_array
     result = np.clip(result, 0, 255)
 
-    # save_to_txt(f'green_{color}_column_interpolation.txt', result)
+    # save_to_txt(f'interpolated_{color}_column.txt', result)
     return result
+
+def get_all_color_interpolation(indice_storage, storage):
+    green_pixel_vals = []
+    for color in indice_storage:
+        if color == 'green':
+            continue
+        
+        mask = mask_by_color(color)
+
+        interpolated_green_with_color_horizontal = interpolate_horizontal(storage['green'], color)
+        interpolated_green_with_color_vertical = interpolate_vertical(storage['green'], color)
+
+        save_to_txt(f'green_interpolation_with_{color}_horizontal.txt', interpolated_green_with_color_horizontal)
+        save_to_txt(f'green_interpolation_with_{color}_vertical.txt', interpolated_green_with_color_vertical)
+
+        guided_upsample_horizontal = guided_upsampling(storage[color], interpolated_green_with_color_horizontal)
+        guided_upsample_vertical = guided_upsampling(storage[color], interpolated_green_with_color_vertical)
+
+        interpolated_horizontal = get_row_interpolation(color, storage[color], guided_upsample_horizontal)
+        interpolated_vertical = get_column_interpolation(color, storage[color], guided_upsample_vertical)
+
+        # save_to_txt(f'interpolated_{color}_horizontal.txt', interpolated_horizontal)
+        # save_to_txt(f'interpolated_{color}_vertical.txt', interpolated_vertical)
+    
+        color_differences_horizontal = interpolated_green_with_color_horizontal - interpolated_horizontal
+        color_differences_vertical = interpolated_green_with_color_vertical - interpolated_vertical
+        
+        # save_to_txt(f'color_difference_{color}_horizontal.txt', color_differences_horizontal)
+        # save_to_txt(f'color_difference_{color}_vertical.txt', color_differences_vertical)
+
+        color_total = color_differences_vertical + color_differences_horizontal
+        green_at_color = np.where(mask, color_total, 0) + storage[color]
+        green_pixel_vals.append(green_at_color)
+
+        # save_to_txt(f'missing_green_at_{color}.txt', green_at_color)
+
+    return green_pixel_vals
 
 
 if __name__ == '__main__':
@@ -211,20 +244,13 @@ if __name__ == '__main__':
                  }
 
     get_color_sub_arrays(sub_arrays)
+    green_pixels = sub_arrays['green']
+    missing_green_pixels = get_all_color_interpolation(rgb_ir_indices, sub_arrays)
+
+    # for color_array in missing_green_pixels:
+    #     green_pixels += color_array
+
+    # save_to_txt('full_green.txt', green_pixels)
     
-    for color in rgb_ir_indices:
-        if color == 'green':
-            continue
-
-        interpolated_color_horizontal = interpolate_horizontal(sub_arrays['green'], color)
-        interpolated_color_vertical = interpolate_vertical(sub_arrays['green'], color)
-
-        guided_upsample_horizontal = guided_upsampling(sub_arrays[color], interpolated_color_horizontal)
-        guided_upsample_vertical = guided_upsampling(sub_arrays[color], interpolated_color_vertical)
-
-        interpolated_horizontal = get_row_interpolation(color, sub_arrays[color], guided_upsample_horizontal)
-        interpolated_vertical = get_column_interpolation(color, sub_arrays[color], guided_upsample_vertical)
-
-        # save_to_txt(f'interpolated_{color}_horizontal.txt', interpolated_horizontal)
-        # save_to_txt(f'interpolated_{color}_vertical.txt', interpolated_vertical)
+    
     
