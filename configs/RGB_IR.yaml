@@ -1,11 +1,11 @@
 module_enable_status:                 # do NOT modify modules order
-  dpc: False
+  dpc: True
   blc: True
-  aaf: True
+  aaf: False
   awb: False
-  cnf: True
+  cnf: False
   cfa: True
-  ccm: True
+  ccm: False
   gac: False
   csc: False
   nlm: False
