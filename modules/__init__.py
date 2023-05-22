@@ -15,3 +15,5 @@ from .gac import GAC
 from .hsc import HSC
 from .nlm import NLM
 from .scl import SCL
+from .irc import IRC
+from .rgbir import RGBIR
