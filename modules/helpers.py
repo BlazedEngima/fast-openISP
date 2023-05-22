@@ -6,6 +6,8 @@
 import numpy as np
 import os
 import math
+from scipy.ndimage import zoom, gaussian_filter
+import cv2
 
 
 def get_bayer_indices(pattern):
@@ -226,15 +228,12 @@ def save_to_txt(name, obj):
     output_path = os.path.join(OUTPUT_DIR, name)
     np.savetxt(output_path, obj, fmt='%d')
     
-def mask_by_color(color, pattern_dict, image, kernel_size=(4, 4)):
-    
-    # Get indices of the r, g, b, and ir of the 4x4 kernel from the sensor
-    indices = pattern_dict[color]
 
+def mask_by_color(indices, image, kernel_size=(4, 4)):
+    
     # Create a mask for the kernel
     small_mask = np.zeros(kernel_size, dtype=bool)
-    for idx in indices:
-        small_mask[idx] = True
+    small_mask[indices] = True
     # Calculate how many repetitions to perform to tile the mask for both the height and width
     repetitions = (
                     math.ceil(image.shape[0] / small_mask.shape[0]), 
@@ -246,38 +245,32 @@ def mask_by_color(color, pattern_dict, image, kernel_size=(4, 4)):
 
     return mask
 
+
 def get_color_indices(color, pattern_dict, image, kernel_size=(4, 4)):
-    mask = mask_by_color(color, pattern_dict, image, kernel_size)
-    return np.column_stack(np.where(mask))
+    indices = pattern_dict[color]
+    mask = mask_by_color(indices, image, kernel_size)
+    return np.where(mask)
 
-def extract_IR(image, pattern_dict, kernel_size=(4, 4)):
-    mask = mask_by_color('IR', pattern_dict, image, kernel_size)
-    IR_values = np.where(mask, image, 0)
 
-    return IR_values
-    
 def transform_red_to_blue(red_index, image, pattern_dict, __mask__=False):
-    x = red_index[:, 0]
-    y = red_index[:, 1]
+    x = red_index[0]
+    y = red_index[1]
 
-    # Initialize zero arrays
-    left_blue = np.zeros_like(x)
-    top_blue = np.zeros_like(x)
-    bottom_blue = np.zeros_like(x)
-    right_blue = np.zeros_like(x)
+    # Pad original image with 2 rows and columns of zero on the right and bottom side
+    padded_image = np.pad(image, (0, 2), mode='constant')
 
-    # Get valid indices within the boundaries of the image indices
+    # Get valid indices within the boundaries of the image indices and get the surrounding blues
     valid_indices = (y - 2 >= 0)
-    left_blue[valid_indices] = image[x[valid_indices], y[valid_indices] - 2]
+    left_blue = np.where(valid_indices, padded_image[x, y - 2], 0)
 
     valid_indices = (x - 2 >= 0)
-    top_blue[valid_indices] = image[x[valid_indices] - 2, y[valid_indices]]
+    top_blue = np.where(valid_indices, padded_image[x - 2, y], 0)
     
     valid_indices = (x + 2 < image.shape[0])
-    bottom_blue[valid_indices] = image[x[valid_indices] + 2, y[valid_indices]]
+    bottom_blue = np.where(valid_indices, padded_image[x + 2, y], 0)
 
     valid_indices = (y + 2 < image.shape[1])
-    right_blue[valid_indices] = image[x[valid_indices], y[valid_indices] + 2]
+    right_blue = np.where(valid_indices, padded_image[x, y + 2], 0)
 
     # Add the surrounding blue pixels together
     numerator = left_blue + right_blue + top_blue + bottom_blue
@@ -287,84 +280,97 @@ def transform_red_to_blue(red_index, image, pattern_dict, __mask__=False):
             (right_blue != 0).astype(int) + 
             (top_blue != 0).astype(int) + 
             (bottom_blue != 0).astype(int))
+
+    # Get the average and place it in the original image
+    image.put(np.ravel_multi_index(red_index, image.shape), numerator // divisor)
     
-    # Make sure division by 0 doesnt occur
-    divisor[divisor == 0] = 1
-
-    # Get the average
-    image[x, y] = numerator // divisor
-
     # Performing masking if wanted
     if __mask__:
-        mask = mask_by_color('red', pattern_dict, result)
-        result = np.where(mask, result, 0)
+        mask = mask_by_color('red', pattern_dict, image)
+        result = np.where(mask, image, 0)
         return result
+
 
 def transform_IR_to_red(IR_pos_index, IR_neg_index, image, pattern_dict, __mask__=False):
-    pos_x = IR_pos_index[:, 0]
-    pos_y = IR_pos_index[:, 1]
-    neg_x = IR_neg_index[:, 0]
-    neg_y = IR_neg_index[:, 1]
+    pos_x = IR_pos_index[0]
+    pos_y = IR_pos_index[1]
+    neg_x = IR_neg_index[0]
+    neg_y = IR_neg_index[1]
 
-    top_left_val = np.zeros_like(neg_x)
-    top_right_val = np.zeros_like(pos_x)
-    bottom_left_val = np.zeros_like(pos_x)
-    bottom_right_val = np.zeros_like(neg_x)
+    # Pad original image with 2 rows and columns of zero on the right and bottom side
+    padded_image = np.pad(image, (0, 1), mode='constant')
 
+    # Get valid indices within the boundaries of the image indices and get the
+    # diagonal reds whether it be positive or negative following the index arrays
     valid_indices = (pos_x + 1 < image.shape[0]) & (pos_y - 1 >= 0)
-    top_right_val[valid_indices] = image[pos_x[valid_indices] + 1, pos_y[valid_indices] - 1]
+    top_right_val = np.where(valid_indices, padded_image[pos_x + 1, pos_y - 1], 0)
 
     valid_indices = (pos_x - 1 >= 0) & (pos_y + 1 < image.shape[1])
-    bottom_left_val[valid_indices] = image[pos_x[valid_indices] - 1, pos_y[valid_indices] + 1]
+    bottom_left_val = np.where(valid_indices, padded_image[pos_x - 1, pos_y + 1], 0)
 
     valid_indices = (neg_x - 1 >= 0) & (neg_y - 1 >= 0)
-    top_left_val[valid_indices] = image[neg_x[valid_indices] - 1, neg_y[valid_indices] - 1]
+    top_left_val = np.where(valid_indices, padded_image[neg_x - 1, neg_y - 1], 0)
 
     valid_indices = (neg_x + 1 < image.shape[0]) & (neg_y + 1 < image.shape[1])
-    bottom_right_val[valid_indices] = image[neg_x[valid_indices] + 1, neg_y[valid_indices] + 1]
+    bottom_right_val = np.where(valid_indices, padded_image[neg_x + 1, neg_y + 1], 0)
 
+    # Get average for negative diagonal
     numerator = top_left_val + bottom_right_val
-    divisor = ((top_left_val != 0).astype(int) + (bottom_right_val != 0).astype(int))
-    divisor[divisor == 0] = 1
-
+    divisor = ((top_left_val != 0).astype(np.uint8) + (bottom_right_val != 0).astype(np.uint8))
     answer = numerator // divisor
-    answer[answer == 0] = image[-1, -1]
-    image[neg_x, neg_y] = answer
 
+    # Put into original image
+    image.put(np.ravel_multi_index(IR_neg_index, image.shape), answer)
+    
+    # Get average for positive diagonal
     numerator = top_right_val + bottom_left_val
-    divisor = ((top_right_val != 0).astype(int) + (bottom_left_val != 0).astype(int))
+    divisor = ((top_right_val != 0).astype(np.uint8) + (bottom_left_val != 0).astype(np.uint8))
+    
+    # Handle edge case for IR at bottom right with no positive diagonal red
     divisor[divisor == 0] = 1
 
     answer = numerator // divisor
     answer[answer == 0] = image[-1, -1]
-    image[pos_x, pos_y] = answer
+
+    # Put back into original image
+    image.put(np.ravel_multi_index(IR_pos_index, image.shape), answer)
 
     if __mask__:
-        mask = mask_by_color('IR', pattern_dict, result)
-        result = np.where(mask, result, 0)
+        mask = mask_by_color('IR', pattern_dict, image)
+        result = np.where(mask, image, 0)
         return result
 
-def fill_zeroes(color_channel, kernel_size, color_position):
-    """
-    Fill 0 values of a 2D numpy array with
-    color pixels in the bottom right of a certain kernel size.
-    Used to fill IR pixels.
-    IR pixels location is at the bottom right in a 2x2 kernel.
-    """
-    bottom_right_val = color_channel[color_position[0]::kernel_size[0], color_position[1]::kernel_size[1]]
-    color_channel = np.kron(bottom_right_val, np.ones((2, 2))).astype(np.uint16)
-    return color_channel
-    
 
-def subtract_IR(convolved_image, IR_color_channel, red_coeff=0.25, green_coeff=0, blue_coeff=0.12):
+def subtract_IR(convolved_image, IR_color_channel, red_coeff=0.717, green_coeff=0.22, blue_coeff=0.375):
+    resized_IR = np.kron(IR_color_channel, np.ones((2, 2)))
     red, green_red, green_blue, blue = get_bayer_indices('bggr')
-    pattern = {'red' : (red,), 'green' : (green_red, green_blue), 'blue': (blue,)}
-    
-    red_indices = get_color_indices('red', pattern, convolved_image, (2, 2))
-    green_indices = get_color_indices('green', pattern, convolved_image, (2, 2))
-    blue_indices = get_color_indices('blue', pattern, convolved_image, (2, 2))
+    red_subtract = red_coeff * resized_IR
+    green_subtract = green_coeff * resized_IR
+    blue_subtract = blue_coeff * resized_IR
 
-    convolved_image[red_indices[:, 0], red_indices[:, 1]] -= (red_coeff * IR_color_channel[red_indices[:, 0], red_indices[:, 1]]).astype(np.uint16)
-    convolved_image[green_indices[:, 0], green_indices[:, 1]] -= (green_coeff * IR_color_channel[green_indices[:, 0], green_indices[:, 1]]).astype(np.uint16)
-    convolved_image[blue_indices[:, 0], blue_indices[:, 1]] -= (blue_coeff * IR_color_channel[blue_indices[:, 0], blue_indices[:, 1]]).astype(np.uint16)
+    red_mask = mask_by_color(red, convolved_image, (2, 2))
+    green_mask = mask_by_color((green_red, green_blue), convolved_image, (2, 2))
+    blue_mask = mask_by_color(blue, convolved_image, (2, 2))
     
+    red_subtract = np.where(red_mask, red_subtract.astype(np.uint32), 0)
+    green_subtract = np.where(green_mask, green_subtract.astype(np.uint32), 0)
+    blue_subtract = np.where(blue_mask, blue_subtract.astype(np.uint32), 0)
+    
+    convolved_image -= (red_subtract + green_subtract + blue_subtract)
+
+
+# Perform Guided upsampling by Gaussian Filtering
+def guided_upsampling(target_image, guide_image, zoom_lvl=2, sigma=1.0):
+    # Upscale ir image
+    upscaled_ir_image = zoom(target_image, zoom_lvl, order=0)
+
+    # Apply Gaussian filtering to the guide image
+    smoothed_guide = gaussian_filter(guide_image, sigma)
+
+    # Compute the guidance map
+    guidance_map = smoothed_guide - upscaled_ir_image 
+
+    # Apply the guidance map to the upsampled image
+    output_image = upscaled_ir_image + guidance_map
+
+    return output_image

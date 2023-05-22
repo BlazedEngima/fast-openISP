@@ -12,12 +12,12 @@ import math
 import importlib
 from collections import OrderedDict
 from multiprocessing import Process
+from modules.helpers import guided_upsampling
 
 import numpy as np
 
 from utils.yacs import Config
 from modules.basic_module import MODULE_DEPENDENCIES
-
 
 class Pipeline:
     """ Core fast-openISP pipeline """
@@ -114,6 +114,11 @@ class Pipeline:
             print_('Done. Elapsed {:.3f}s'.format(time.time() - start))
 
         data['output'] = self.get_output(data)
+        
+        if 'ir' in data:
+            upsampled_ir = guided_upsampling(data['ir'], data['bayer'])
+            data['ir'] = upsampled_ir
+
         print_('Pipeline elapsed {:.3f}s'.format(time.time() - pipeline_start))
 
         return data, intermediates
