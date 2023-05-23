@@ -70,7 +70,10 @@ To process RGB-IR images using the pipeline, follow these steps:
 1.  Run the RGBIR demo file
     
     `py demo_rgbir.py`
-    
+
+To change the parameters on modules and other hyper parameters,
+please edit the `.yaml` files and tune the settings to produce the
+desired image.
 
 ## License
 
