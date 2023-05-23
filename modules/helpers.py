@@ -224,13 +224,27 @@ def bilateral_filter(array, spatial_weights, intensity_weights_lut, right_shift=
 # Author: Samuel Theofie (samueltheofie@gmail.com)
 
 def save_to_txt(name, obj):
+    """
+    Standard function to write numpy array to a txt file.
+    Used for debugging.
+    :param name: output file name
+    :param obj: any numpy ndarray
+    """
     OUTPUT_DIR = './output'
     output_path = os.path.join(OUTPUT_DIR, name)
     np.savetxt(output_path, obj, fmt='%d')
     
 
 def mask_by_color(indices, image, kernel_size=(4, 4)):
-    
+    """
+    Function to mask a numpy matrix by the specific locations
+    dictated by their kernel pattern.
+    Used for getting r, g, b, or ir pixels in a numpy matrix.
+    :param indices: tuple of ((rows), (columns)) in the kernel to mask
+    :param image: input numpy matrix which is the input file
+    :param kernel_size: the repeating kernel size
+    :return: a numpy mask for the whole image
+    """
     # Create a mask for the kernel
     small_mask = np.zeros(kernel_size, dtype=bool)
     small_mask[indices] = True
@@ -247,12 +261,29 @@ def mask_by_color(indices, image, kernel_size=(4, 4)):
 
 
 def get_color_indices(color, pattern_dict, image, kernel_size=(4, 4)):
+    """
+    Wrapper function that returns indices specified by mask_by_color throughout
+    the whole matrix.
+    :param color: a dictionary key in pattern_dict indicating the color
+    :param pattern_dict: a dictionary container that holds locations of colors in the kernel
+    :param image: a numpy mattrix which is the input file
+    :param kernel_size: the repeating kernel size
+    :return: a tuple of ((row_indices), (column_indices))
+    """
     indices = pattern_dict[color]
     mask = mask_by_color(indices, image, kernel_size)
     return np.where(mask)
 
 
 def transform_red_to_blue(red_index, image, pattern_dict, __mask__=False):
+    """
+    Main function to interpolate red pixels in the rgb_ir 4x4 kernel pattern
+    to blue pixels to form a bggr bayer pattern.
+    :param red_index: a tuple of ((row_indices), (column_indices)) indicating locations of red pixels
+    :param image: a numpy matrix which is the input file
+    :param pattern_dict: a dictionary container that holds the locations of colors in the kernel
+    :param __mask__: a boolean to return a mask of the updated new red pixels, for debugging
+    """
     x = red_index[0]
     y = red_index[1]
 
@@ -292,6 +323,17 @@ def transform_red_to_blue(red_index, image, pattern_dict, __mask__=False):
 
 
 def transform_IR_to_red(IR_pos_index, IR_neg_index, image, pattern_dict, __mask__=False):
+    """
+    Main function to interpolate ir pixels in the rgb_ir 4x4 kernel pattern
+    to red pixels to form a bggr bayer pattern.
+    :param IR_pos_index: a tuple of ((row_indices), (column_indices)) indicating locations of ir pos
+        which indicates performing positive spline
+    :param IR_neg_index: a tuple of ((row_indices), (column_indices)) indicating locations of ir neg
+        which indicates performing negative spline
+    :param image: a numpy matrix which is the input file
+    :param pattern_dict: a dictionary container that holds the locations of colors in the kernel
+    :param __mask__: a boolean to return a mask of the updated new red pixels, for debugging
+    """
     pos_x = IR_pos_index[0]
     pos_y = IR_pos_index[1]
     neg_x = IR_neg_index[0]
@@ -341,26 +383,50 @@ def transform_IR_to_red(IR_pos_index, IR_neg_index, image, pattern_dict, __mask_
         return result
 
 
-def subtract_IR(convolved_image, IR_color_channel, red_coeff=0.717, green_coeff=0.22, blue_coeff=0.375):
+def subtract_IR(convolved_image, IR_color_channel, red_coeff=0.717, green_coeff=0.24, blue_coeff=0.375):
+    """
+    Main function that decreases the ir intensity in the newly formed bggr pattern.
+    :param convolved_image: a numpy array which is the newly formed bggr pattern
+    :param IR_color_channel: the ir color channel to use for subtraction
+        expected to be of 1/4 resolution than the convolved_image and will be upscaled
+    :param red_coeff: coefficient to decrease for red intensity values
+    :param green_coeff: coefficient to decrease for green intensity values
+    :param blue_coeff: coefficient to decrease for blue intensity values
+    """
+    # Upsample the IR_color_channel
     resized_IR = np.kron(IR_color_channel, np.ones((2, 2)))
+
+    # Get the indice pattern for red, green, and blue in the bggr bayer pattern
     red, green_red, green_blue, blue = get_bayer_indices('bggr')
+
+    # Get the subtraction amount depending on the coefficient
     red_subtract = red_coeff * resized_IR
     green_subtract = green_coeff * resized_IR
     blue_subtract = blue_coeff * resized_IR
 
+    # Get masks for subtraction at the right pixel values
     red_mask = mask_by_color(red, convolved_image, (2, 2))
     green_mask = mask_by_color((green_red, green_blue), convolved_image, (2, 2))
     blue_mask = mask_by_color(blue, convolved_image, (2, 2))
     
+    # Form subtraction matrices with the masks
     red_subtract = np.where(red_mask, red_subtract.astype(np.uint32), 0)
     green_subtract = np.where(green_mask, green_subtract.astype(np.uint32), 0)
     blue_subtract = np.where(blue_mask, blue_subtract.astype(np.uint32), 0)
     
+    # Subtract the convolved image with the subtraction matrices
     convolved_image -= (red_subtract + green_subtract + blue_subtract)
 
 
-# Perform Guided upsampling by Gaussian Filtering
 def guided_upsampling(target_image, guide_image, zoom_lvl=2, sigma=1.0):
+    """
+    Main function to perform guided upsampling by gaussian filtering.
+    :param target_image: the lower resolution image to upsample
+    :param guide_image: the higher resolution image to act as a guide
+    :param zoom_lvl: upsampling factor to apply to the target_image
+    :param sigma: standard deviation of pixel values of the guide image
+    :return: upsampled target_image guided by guide_image
+    """
     # Upscale ir image
     upscaled_ir_image = zoom(target_image, zoom_lvl, order=0)
 

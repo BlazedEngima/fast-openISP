@@ -101,11 +101,11 @@ fcs:
 
 hsc:
   hue_offset: 0                       # in degree
-  saturation_gain: 256                # x256
+  saturation_gain: 512                # x256
 
 bcc:
-  brightness_offset: 0
-  contrast_gain: 256                  # x256
+  brightness_offset: 4
+  contrast_gain: 512                  # x256
 
 scl:
   width: 1920
