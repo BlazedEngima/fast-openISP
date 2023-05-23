@@ -1,7 +1,7 @@
 module_enable_status:                 # do NOT modify modules order
-  dpc: True
+  dpc: False
   blc: True
-  aaf: True
+  aaf: False
   irc: True
   rgbir: True
   awb: True
@@ -18,6 +18,7 @@ module_enable_status:                 # do NOT modify modules order
   hsc: True
   bcc: True
   scl: False
+  irg: True
 
 hardware:
   raw_width: 2592
@@ -41,16 +42,24 @@ blc:
 
 aaf: ~
 
+irc:
+  clip_lvl: 1.3
+
 awb:
-  r_gain: &r_gain 1860                # x1024
-  gr_gain: 756                       # x756
-  gb_gain: 756                       # x756
-  b_gain: &b_gain 1280                # x1024
+  r_gain: &r_gain 2180                # x1024
+  gr_gain: 896                       # x896
+  gb_gain: 896                       # x896
+  b_gain: &b_gain 1408                # x1024
 
 cnf:
   diff_threshold: 0
   r_gain: *r_gain                     # x1024
   b_gain: *b_gain                     # x1024
+
+rgbir:
+  red_cut: 0.710
+  green_cut: 0.560
+  blue_cut: 0.673
 
 cfa:
   mode: malvar
@@ -101,3 +110,5 @@ bcc:
 scl:
   width: 1920
   height: 1080
+
+irg: ~

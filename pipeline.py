@@ -114,10 +114,6 @@ class Pipeline:
             print_('Done. Elapsed {:.3f}s'.format(time.time() - start))
 
         data['output'] = self.get_output(data)
-        
-        if 'ir' in data:
-            upsampled_ir = guided_upsampling(data['ir'], data['bayer'])
-            data['ir'] = upsampled_ir
 
         print_('Pipeline elapsed {:.3f}s'.format(time.time() - pipeline_start))
 
