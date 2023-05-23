@@ -3,6 +3,7 @@
  [![Python](https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue.svg)](https://www.python.org/downloads/release/python-390/) [![OpenISP](https://img.shields.io/badge/OpenISP-v1.2.3-orange.svg)](https://github.com/QiuJueqin/fast-openISP)
 
 The RGB-IR Image Signal Processing Pipeline is a graphics project (CSC4140) @CUHKSZ. This project extends the functionality of the fast-openISP repository by [Qiu Jueqin](https://github.com/QiuJueqin) by integrating support for processing RGB-IR images. Currently, the extended pipeline expects a 4x4 dense RGB-IR sensor kernel to operate on. 
+
 ![[Pasted image 20230523142825.png]](assets/Pasted%20image%2020230523142825.png)
 The pipeline allows for efficient and accurate processing of images captured using RGB-IR cameras, enhancing the overall quality and extracting valuable information from the input.
 
@@ -35,6 +36,7 @@ The RGBIR module executes on the bayer matrix by interpolating IR values to red 
 
 ![[Pasted image 20230523145755.png]](assets/Pasted%20image%2020230523145755.png)
 The red-to-blue interpolation follows a similar logic. It takes every red pixel and averages the nearby blue pixels.
+
 ![[Pasted image 20230523145937.png]](assets/Pasted%20image%2020230523145937.png)
 
 ### IR cutting
@@ -105,7 +107,16 @@ This project is licensed under the MIT License. See the [LICENSE](https://mit-li
 
 ## Output
 
-![image](output/rbg_ir_test_dim.png) ![image_2](output/rbg_ir_test_dim_ir.png) ![image_3](output/rbg_ir_test_bright.png) ![image_4](output/rbg_ir_test_bright_ir.png)
+| ![image](output/rbg_ir_test_dim.png) | ![image_2](output/rbg_ir_test_dim_ir.png) |
+| :----------------------------------: | :---------------------------------------: |
+| RGB color image in dim lighting      | Generated IR image                        |
+
+
+| ![image_3](output/rbg_ir_test_bright.png) | ![image_4](output/rbg_ir_test_bright_ir.png) |
+| :---------------------------------------: | :------------------------------------------: |
+| RGB color image in bright lighting        | Generated IR image                           |
+
+ 
 
 ---
 
