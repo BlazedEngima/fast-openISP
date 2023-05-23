@@ -25,9 +25,11 @@ def demo_rgb_ir_raw_dim():
     output_path_ir = op.join(OUTPUT_DIR, 'rbg_ir_test_dim_ir.png')
 
     output = cv2.cvtColor(data['output'], cv2.COLOR_RGB2BGR)
-    output_ir = data['ir']
-    cv2.imwrite(output_path_ir, output_ir)
     cv2.imwrite(output_path, output)
+
+    if 'ir' in data:
+        output_ir = data['ir']
+        cv2.imwrite(output_path_ir, output_ir)
 
 def demo_rgb_ir_raw_bright():
     cfg = Config('configs/RGB_IR_bright.yaml')
@@ -42,9 +44,11 @@ def demo_rgb_ir_raw_bright():
     output_path_ir = op.join(OUTPUT_DIR, 'rbg_ir_test_bright_ir.png')
 
     output = cv2.cvtColor(data['output'], cv2.COLOR_RGB2BGR)
-    output_ir = data['ir']
-    cv2.imwrite(output_path_ir, output_ir)
     cv2.imwrite(output_path, output)
+
+    if 'ir' in data:
+        output_ir = data['ir']
+        cv2.imwrite(output_path_ir, output_ir)
 
 if __name__ == '__main__':
     print('Processing test raw dim...')
