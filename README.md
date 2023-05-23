@@ -1,124 +1,83 @@
-# Fast Open Image Signal Processor (fast-openISP)
+# RGB-IR Image Signal Processing Pipeline
 
-As told by its name, fast-openISP is a **faster** (and bugs-fixed) re-implementation of
-the [openISP](https://github.com/cruxopen/openISP) project.
+ [![Python](https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue.svg)](https://www.python.org/downloads/release/python-390/) [![OpenISP](https://img.shields.io/badge/OpenISP-v1.2.3-orange.svg)](https://github.com/QiuJueqin/fast-openISP)
 
-Compared to C-style code in the official openISP repo, fast-openISP uses pure matrix implementations based on Numpy, and
-increases processing speed **over 300 times**.
+The RGB-IR Image Signal Processing Pipeline is a graphics project (CSC4140) @CUHKSZ. This project extends the functionality of the fast-openISP repository by [Qiu Jueqin](https://github.com/QiuJueqin) by integrating support for processing RGB-IR images. Currently, the extended pipeline expects a 4x4 dense RGB-IR sensor kernel to operate on. 
+![[Pasted image 20230523142825.png]](docs/Pasted%20image%2020230523142825.png)
+The pipeline allows for efficient and accurate processing of images captured using RGB-IR cameras, enhancing the overall quality and extracting valuable information from the input.
 
-Here is the running time in my Ryzen 7 1700 8-core 3.00GHz machine with the 1920x1080 input Bayer array:
+## Table of Contents
 
-|Module             |openISP |fast-openISP|
-|:-----------------:|:------:|:----------:|
-|DPC                |20.57s  |0.29s       |
-|BLC                |11.75s  |0.02s       |
-|AAF                |16.87s  |0.08s       |
-|AWB                |7.54s   |0.02s       |
-|CNF                |73.99s  |0.25s       |
-|CFA                |40.71s  |0.20s       |
-|CCM                |56.85s  |0.06s       |
-|GAC                |25.71s  |0.07s       |
-|CSC                |60.32s  |0.06s       |
-|NLM                |1600.95s|5.37s       |
-|BNF                |801.24s |0.75s       |
-|CEH<sup>*</sup>    |-       |0.14s       |
-|EEH                |68.60s  |0.24s       |
-|FCS                |25.07s  |0.08s       |
-|HSC                |56.34s  |0.07s       |
-|BBC                |27.92s  |0.03s       |
-|End-to-end pipeline|2894.41s|7.82s       |
+-   [Introduction](#introduction)
+-   [Modifications](#modifications)
+-   [Installation](#installation)
+-   [Running](#running)
+-   [License](#license)
 
-> <sup>*</sup> CEH module is not included in the official openISP pipeline.
+## Introduction
 
+The RGB-IR ISP Pipeline is a project designed to expand the capabilities of the existing fast-openISP repository, enabling it to process RGB-IR image data. Following the original repository, the image data is operated on via numpy to enable fast processing. The image processing pipeline follows the implementation of the standard [openISP](https://github.com/cruxopen/openISP) project.
 
-# Usage
+![[Pasted image 20230523143723.png]](docs/Pasted%20image%2020230523143723.png)
+Details on the specific module operations can be found [here](https://github.com/cruxopen/openISP/blob/master/docs/Image%20Signal%20Processor.pdf).
 
-Clone this repo and run
+## Modifications
 
+The main implementation idea can be found in Yeong-Kang Lai, Yao-Hsien Huang, and Yeong-Lin Lai's paper [here](https://ieeexplore.ieee.org/document/10043554) . The overarching idea is to transform the dense 4x4 RGB-IR kernel into the standard BGGR bayer pattern in the pipeline. This job is performed by the RGBIR module found in `modules/rgbir.py`. The module takes in three configuration settings called `red_cut`, `green_cut`, and `blue_cut` which can be adjusted in the configuration `.yaml` file.
+
+This module is placed after Anti-aliasing Filter (aaf) and before the auto-white balance (awb). The transformation should take place before auto-white balancing to preserve the black and light tones in the generated IR image output. 
+
+### The RBGIR Module
+
+The RGBIR module executes on the bayer matrix by interpolating IR values to red values and red values to blue values. The IR-to-red interpolation takes every IR pixel and averages the nearby red diagonals. This will then act as the red pixel in a BGGR bayer pattern. 
+>This interpolation has a special edge case at the bottom right corner as can be seen. To handle this edge case, we just keep the original IR value in this position.
+
+![[Pasted image 20230523145755.png]](docs/Pasted%20image%2020230523145755.png)
+The red-to-blue interpolation follows a similar logic. It takes every red pixel and averages the nearby blue pixels.
+![[Pasted image 20230523145937.png]](docs/Pasted%20image%2020230523145937.png)
+
+### IR cutting
+Afterwards, we perform an IR cut from all the pixels of the transformed BGGR bayer pattern, where
 ```
-python demo.py
+R' = R - red_coef * IR
+G' = G - green_coef * IR
+B' = B - blue_coef * IR
 ```
+To perform the IR cut, we first extract the IR values from the initial RGB-IR bayer matrix. This is done by a helper array called IRC which is called right before the RGBIR module. Additionally, the IRC module also clips high IR values determined by an adjustable clipping coefficient. Increasing this coefficient means trading some chrome noise for better color accuracy.
 
-The ISP outputs will be saved to `./output` directory.
+The IR cut is performed in a 2x2 BGGR bayer kernel, where the IR of every 2x2 in the original RGBIR pattern is used to decrease the R, G, and B values in said kernel. The coefficients are adjustable to generate the best output image.
 
-The only required package for pipeline execution is `numpy`. `opencv-python` and `scikit-image` are required only for 
-data IO.
+### Guided Upsampling by Gaussian Filter
+The extended pipeline will also process an IR image. The IR image processing occurs at the end of the pipeline called by the IRG module. This module upsamples the extracted IR pixels to write to the output. The upsampling performed is guided upsampling by a Gaussian Filter. We use the finished rgb image as a guide to upsample the IR image. The algorithm works by applying a gaussian filter to the reference image to get a guidance map to preserve details in our upsampling. By using the guidance image as a reference, guided upsampling by Gaussian filtering can help preserve important features, such as edges and textures, while reducing artifacts that may be introduced during traditional upsampling methods. It is commonly used in applications such as image super-resolution and enhancing the quality of low-resolution images.
 
-# Algorithms
+## Installation
 
-All modules in fast-openISP
-reproduce [processing algorithms](https://github.com/cruxopen/openISP/blob/master/docs/Image%20Signal%20Processor.pdf)
-in openISP, except for EEH and BCC modules. In addition, a CEH (contrast enhancement) module with [CLAHE](https://en.wikipedia.org/wiki/Adaptive_histogram_equalization#Contrast_Limited_AHE) is 
-added into the fast-openISP pipeline.
+To use the RGB-IR ISP Pipeline, follow these steps:
 
-### EEH (edge enhancement)
+1.  Clone this repository to your local machine:
+    
+    `https://github.com/BlazedEngima/fast-openISP.git`
+    
+2.  Install the required dependencies:
+    
+    `pip install -r requirements.txt`
+    
 
-The official openISP uses
-an [asymmetric kernel](https://github.com/cruxopen/openISP/blob/49de48282e66bdb283779394a23c9c0d6ba238ff/isp_pipeline.py#L150-L164)
-to extract edge map. In fast-openISP, however, we use the subtraction between the original and the gaussian filtered
-Y-channel as the edge estimation, which reduces the artifact when the enhancement gain is large.
+## Running
 
-### BCC (brightness & contrast control)
+To process RGB-IR images using the pipeline, follow these steps:
 
-The official openISP enhances the image contrast by pixel-wise enlarging the difference between pixel values and a
-constant integer (128). In fast-openISP, we use the median value of the whole frame instead of a constant.
+1.  Run the RGBIR demo file
+    
+    `py demo_rgbir.py`
+    
 
+## License
 
-# Parameters
+This project is licensed under the MIT License. See the [LICENSE](https://mit-license.org/) file for more details.
 
-Tunable parameters in fast-openISP are differently named from those in openISP, but they are all self-explained,
-and no doubt you can easily tell the counterparts in two repos. All parameters are managed in a yaml 
-in [`./configs`](./configs), one file per camera.
+## Output
+![image](output/rbg_ir_test_dim.png) ![image_2](output/rbg_ir_test_dim_ir.png) ![image_3](output/rbg_ir_test_bright.png) ![image_4](output/rbg_ir_test_bright_ir.png)
 
-# Demo
-
-|Bayer Input|
-|:-------------------------:|
-|<img src='assets/dpc.jpg' width='580'>| 
-
-
-|CFA Interpolation|
-|:-------------------------:|
-|<img src='assets/cfa.jpg' width='580'>| 
-
-
-|Color Correction|
-|:-------------------------:|
-|<img src='assets/ccm.jpg' width='580'>| 
-
-
-|Gamma Correction|
-|:-------------------------:|
-|<img src='assets/gac.jpg' width='580'>| 
-
-
-|Non-local Means & Bilateral Filter|
-|:-------------------------:|
-|<img src='assets/bnf.jpg' width='580'>| 
-
-
-|Contrast Enhancement|
-|:-------------------------:|
-|<img src='assets/ceh.jpg' width='580'>| 
-
-
-|Edge Enhancement|
-|:-------------------------:|
-|<img src='assets/eeh.jpg' width='580'>| 
-
-
-|Hue & Saturation Control|
-|:-------------------------:|
-|<img src='assets/hsc.jpg' width='580'>| 
-
-
-|Brightness & Contrast Control|
-|:-------------------------:|
-|<img src='assets/bcc.jpg' width='580'>| 
-
-
-# License
-
-Copyright 2021 Qiu Jueqin.
-
-Licensed under [MIT](http://opensource.org/licenses/MIT).
+---
+**Note:** The Fast-OpenISP repository, which this project extends, is licensed separately. Please refer to its documentation for licensing information.
