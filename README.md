@@ -5,6 +5,7 @@
 The RGB-IR Image Signal Processing Pipeline is a graphics project (CSC4140) @CUHKSZ. This project extends the functionality of the fast-openISP repository by [Qiu Jueqin](https://github.com/QiuJueqin) by integrating support for processing RGB-IR images. Currently, the extended pipeline expects a 4x4 dense RGB-IR sensor kernel to operate on. 
 
 ![[Pasted image 20230523142825.png]](assets/Pasted%20image%2020230523142825.png)
+
 The pipeline allows for efficient and accurate processing of images captured using RGB-IR cameras, enhancing the overall quality and extracting valuable information from the input.
 
 ## Table of Contents
@@ -20,6 +21,7 @@ The pipeline allows for efficient and accurate processing of images captured usi
 The RGB-IR ISP Pipeline is a project designed to expand the capabilities of the existing fast-openISP repository, enabling it to process RGB-IR image data. Following the original repository, the image data is operated on via numpy to enable fast processing. The image processing pipeline follows the implementation of the standard [openISP](https://github.com/cruxopen/openISP) project.
 
 ![[Pasted image 20230523143723.png]](assets/Pasted%20image%2020230523143723.png)
+
 Details on the specific module operations can be found [here](https://github.com/cruxopen/openISP/blob/master/docs/Image%20Signal%20Processor.pdf).
 
 ## Modifications
