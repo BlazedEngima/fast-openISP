@@ -416,7 +416,7 @@ def subtract_IR(convolved_image, IR_color_channel, red_coeff=0.717, green_coeff=
     
     # Subtract the convolved image with the subtraction matrices
     convolved_image -= (red_subtract + green_subtract + blue_subtract)
-
+    convolved_image = np.clip(convolved_image, 0, 255)
 
 def guided_upsampling(target_image, guide_image, zoom_lvl=2, sigma=1.0):
     """
