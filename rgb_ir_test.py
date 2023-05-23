@@ -19,13 +19,11 @@ def demo_rgb_ir_raw_dim():
     raw_path = 'raw/Dim_color.raw'
     bayer = np.fromfile(raw_path, dtype='uint16', sep='')
     bayer = bayer.reshape((cfg.hardware.raw_height, cfg.hardware.raw_width))
-    # bayer = pre_process(bayer)
     data, _ = pipeline.execute(bayer)
 
     output_path = op.join(OUTPUT_DIR, 'rbg_ir_test_dim.png')
     output_path_ir = op.join(OUTPUT_DIR, 'rbg_ir_test_dim_ir.png')
 
-    # np.savetxt(output_path, bayer)
     output = cv2.cvtColor(data['output'], cv2.COLOR_RGB2BGR)
     output_ir = data['ir']
     cv2.imwrite(output_path_ir, output_ir)
@@ -38,13 +36,11 @@ def demo_rgb_ir_raw_bright():
     raw_path = 'raw/Bright_color.raw'
     bayer = np.fromfile(raw_path, dtype='uint16', sep='')
     bayer = bayer.reshape((cfg.hardware.raw_height, cfg.hardware.raw_width))
-    # bayer = pre_process(bayer)
     data, _ = pipeline.execute(bayer)
 
     output_path = op.join(OUTPUT_DIR, 'rbg_ir_test_bright.png')
     output_path_ir = op.join(OUTPUT_DIR, 'rbg_ir_test_bright_ir.png')
 
-    # np.savetxt(output_path, bayer)
     output = cv2.cvtColor(data['output'], cv2.COLOR_RGB2BGR)
     output_ir = data['ir']
     cv2.imwrite(output_path_ir, output_ir)
