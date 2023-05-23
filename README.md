@@ -3,7 +3,7 @@
  [![Python](https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue.svg)](https://www.python.org/downloads/release/python-390/) [![OpenISP](https://img.shields.io/badge/OpenISP-v1.2.3-orange.svg)](https://github.com/QiuJueqin/fast-openISP)
 
 The RGB-IR Image Signal Processing Pipeline is a graphics project (CSC4140) @CUHKSZ. This project extends the functionality of the fast-openISP repository by [Qiu Jueqin](https://github.com/QiuJueqin) by integrating support for processing RGB-IR images. Currently, the extended pipeline expects a 4x4 dense RGB-IR sensor kernel to operate on. 
-![[Pasted image 20230523142825.png]](docs/Pasted%20image%2020230523142825.png)
+![[Pasted image 20230523142825.png]](assets/Pasted%20image%2020230523142825.png)
 The pipeline allows for efficient and accurate processing of images captured using RGB-IR cameras, enhancing the overall quality and extracting valuable information from the input.
 
 ## Table of Contents
@@ -18,7 +18,7 @@ The pipeline allows for efficient and accurate processing of images captured usi
 
 The RGB-IR ISP Pipeline is a project designed to expand the capabilities of the existing fast-openISP repository, enabling it to process RGB-IR image data. Following the original repository, the image data is operated on via numpy to enable fast processing. The image processing pipeline follows the implementation of the standard [openISP](https://github.com/cruxopen/openISP) project.
 
-![[Pasted image 20230523143723.png]](docs/Pasted%20image%2020230523143723.png)
+![[Pasted image 20230523143723.png]](assets/Pasted%20image%2020230523143723.png)
 Details on the specific module operations can be found [here](https://github.com/cruxopen/openISP/blob/master/docs/Image%20Signal%20Processor.pdf).
 
 ## Modifications
@@ -32,9 +32,9 @@ This module is placed after Anti-aliasing Filter (aaf) and before the auto-white
 The RGBIR module executes on the bayer matrix by interpolating IR values to red values and red values to blue values. The IR-to-red interpolation takes every IR pixel and averages the nearby red diagonals. This will then act as the red pixel in a BGGR bayer pattern. 
 >This interpolation has a special edge case at the bottom right corner as can be seen. To handle this edge case, we just keep the original IR value in this position.
 
-![[Pasted image 20230523145755.png]](docs/Pasted%20image%2020230523145755.png)
+![[Pasted image 20230523145755.png]](assets/Pasted%20image%2020230523145755.png)
 The red-to-blue interpolation follows a similar logic. It takes every red pixel and averages the nearby blue pixels.
-![[Pasted image 20230523145937.png]](docs/Pasted%20image%2020230523145937.png)
+![[Pasted image 20230523145937.png]](assets/Pasted%20image%2020230523145937.png)
 
 ### IR cutting
 Afterwards, we perform an IR cut from all the pixels of the transformed BGGR bayer pattern, where
